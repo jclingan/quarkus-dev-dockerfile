@@ -1,0 +1,70 @@
+####
+# This Dockerfile is intended to be be a base image for
+# "mvn compile quarkus:dev -DskipTests". This is helpful for remote development
+####
+
+FROM fabric8/java-alpine-openjdk8-jdk
+# quarkus-resteasy was not added to add-extensions since it is generated in create goal
+# quarkus-hibernate-orm, quarkus-hibernate-orm-panache, quarkus-agroal, and quarkus-flyway were not added to add-extensions because they require a datasource"
+#RUN apk add --no-cache maven shadow && \
+#    /usr/sbin/useradd --create-home --shell /bin/bash quarkus && \
+#    echo "quarkus:quarkus" | chpasswd && \
+#    chown quarkus /home/quarkus && \
+#    chmod 777 /home/quarkus
+RUN apk add --no-cache maven shadow git && \
+    /usr/sbin/useradd --create-home --shell /bin/bash quarkus && \
+    echo "quarkus:quarkus" | chpasswd && \
+    chown quarkus /home/quarkus && \
+    chmod 755 /home/quarkus
+
+USER quarkus
+WORKDIR /home/quarkus
+
+# These are probably no longer necessary. Ran out of resources in openshift
+# Using a local docker install seems to solve this. May be able to delete these.
+#
+
+ENV MAVEN_OPTS="-Xmx8g -Xms512m"
+ENV JAVA_OPTS="-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -Xmx8g -Xms1g"
+
+#
+# This collection of commands primes the local maven repository
+# by building quarkus. Probably overkill.
+#
+
+RUN git clone https://github.com/quarkusio/quarkus.git && \
+    cd quarkus && \
+    git checkout 0.16.1 && \
+    rm -rf docs && \
+    sed -i '/<module>docs/ d' pom.xml && \
+    mvn clean install -DskipTests && \
+    cd .. && \
+    rm -rf quarkus
+
+#
+# This collection of commands primes the local maven repository
+# by creating a sample project, adding all extensions, and then doing
+# a build. This approach doesn't work for some database-related
+# extensions because no datasource is defined.
+
+#RUN mkdir app && cd app && \
+#    mvn io.quarkus:quarkus-maven-plugin:0.16.1:create \
+#    -DprojectGroupId=org.acme \
+#    -DprojectArtifactId=precache \
+#    -Dversion=1.0-SNAPSHOT \
+#    -DclassName="org.acme.quickstart.Context" \
+#    -Dpath="/context" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-agroal,quarkus-arc,quarkus-camel-core,quarkus-camel-infinispan,quarkus-camel-netty4-http,quarkus-camel-salesforce" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-hibernate-validator,quarkus-infinispan-client" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-jdbc-h2,quarkus-jdbc-mariadb,quarkus-jdbc-postgresql,quarkus-jsonb,quarkus-jsonp,quarkus-keycloak,quarkus-kotlin" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-kubernetes,quarkus-amazon-lambda,quarkus-narayana-jta,quarkus-resteasy-jsonb,quarkus-scheduler" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-elytron-security,quarkus-smallrye-context-propagation,quarkus-smallrye-fault-tolerance,quarkus-smallrye-health" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-smallrye-jwt,quarkus-smallrye-metrics,quarkus-smallrye-openapi,quarkus-smallrye-opentracing,quarkus-smallrye-reactive-streams-operators" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-smallrye-reactive-type-converters,io.quarkus:quarkus-smallrye-reactive-messaging,quarkus-smallrye-reactive-messaging-kafka" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-smallrye-rest-client,quarkus-spring-di,quarkus-swagger-ui,io.quarkus:quarkus-undertow,quarkus-undertow-websockets,quarkus-vertx" && \
+#    mvn quarkus:add-extension -Dextensions="quarkus-mailer,quarkus-reactive-pg-client" && \
+#    mvn clean package -DskipTests && \
+#    cd .. && rm -rf app
+    
+#ENTRYPOINT ["/usr/bin/mvn", "compile", "quarkus:dev"]
+ENTRYPOINT ["/bin/echo Quarkus local maven repository primed"]
